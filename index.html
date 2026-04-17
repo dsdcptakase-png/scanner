@@ -1,63 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/@zxing/library@0.19.1"></script>
 
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
-
-<style>
-body {
-  margin:0;
-  font-family:system-ui;
-  background:#eef2f7;
-  text-align:center;
-}
-
-.header {
-  background:#0d6efd;
-  color:white;
-  padding:14px;
-  font-weight:bold;
-}
-
-.container {
-  max-width:420px;
-  margin:auto;
-  padding:10px;
-}
-
-.card {
-  background:white;
-  padding:12px;
-  border-radius:12px;
-  margin-bottom:10px;
-}
-
-video {
-  width:100%;
-  height:240px;
-  object-fit:cover;
-  border-radius:12px;
-  background:black;
-}
-
-button {
-  width:100%;
-  padding:14px;
-  border:none;
-  border-radius:10px;
-  background:#0d6efd;
-  color:white;
-  font-size:16px;
-  margin-top:8px;
-}
-
-.result {
-  font-weight:bold;
-  color:green;
-  word-break:break-word;
-}
-</style>
+    <style>
+        body { margin:0; font-family:system-ui; background:#eef2f7; text-align:center; }
+        .header { background:#0d6efd; color:white; padding:14px; font-weight:bold; }
+        .container { max-width:420px; margin:auto; padding:10px; }
+        .card { background:white; padding:12px; border-radius:12px; margin-bottom:10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        /* Critical: Video must have a background and size for mobile Safari/Chrome */
+        video { width:100%; height:240px; object-fit:cover; border-radius:12px; background:#000; display: block; }
+        button { width:100%; padding:14px; border:none; border-radius:10px; background:#0d6efd; color:white; font-size:16px; margin-top:8px; font-weight: bold; cursor: pointer; }
+        .result { font-weight:bold; color:#198754; word-break:break-word; min-height: 20px; }
+    </style>
 </head>
 
 <body>
@@ -66,84 +22,85 @@ button {
 
 <div class="container">
 
-<!-- TYPE -->
-<div class="card">
-  <label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
-  &nbsp;&nbsp;
-  <label><input type="radio" name="type" value="Charger"> Charger</label>
-</div>
+    <div class="card">
+        <label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
+        &nbsp;&nbsp;
+        <label><input type="radio" name="type" value="Charger"> Charger</label>
+    </div>
 
-<button onclick="startCamera()">📷 Start Camera</button>
+    <button onclick="startScanning()">📷 Start Camera</button>
 
-<div class="card">
-  <video id="video" autoplay muted playsinline></video>
-</div>
+    <div class="card">
+        <video id="video" playsinline muted autoplay></video>
+    </div>
 
-<div class="card result" id="result">Waiting...</div>
+    <div class="card result" id="result">Waiting...</div>
 
-<button onclick="save()">💾 Save</button>
+    <button onclick="save()" style="background:#198754;">💾 Save</button>
 
 </div>
 
 <script>
+    let codeReader = new ZXing.BrowserMultiFormatReader();
+    let scanned = "";
 
-let codeReader;
-let scanned = "";
+    async function startScanning() {
+        const resultEl = document.getElementById("result");
+        
+        try {
+            const videoDevices = await codeReader.listVideoInputDevices();
+            
+            // On mobile, we want the "environment" (back) camera
+            // We look for a device that isn't the front-facing one
+            const backCamera = videoDevices.find(device => 
+                device.label.toLowerCase().includes('back') || 
+                device.label.toLowerCase().includes('rear') ||
+                device.label.toLowerCase().includes('environment')
+            );
 
-// ✅ START CAMERA (FIXED)
-function startCamera() {
+            const deviceId = backCamera ? backCamera.deviceId : videoDevices[0].deviceId;
 
-  codeReader = new ZXing.BrowserMultiFormatReader();
+            // Start decoding from the chosen device
+            codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
+                if (result) {
+                    scanned = result.getText();
+                    resultEl.innerText = "✅ " + scanned;
+                    if (navigator.vibrate) navigator.vibrate(200);
+                }
+                // We ignore 'NotFoundException' to keep the loop running
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error(err);
+                }
+            });
 
-  codeReader.decodeFromConstraints(
-    {
-      video: {
-        facingMode: "environment" // 🔥 FIX (no exact)
-      }
-    },
-    'video',
-    (result, err) => {
-
-      if (result) {
-
-        let text = result.getText();
-
-        if (text === scanned) return;
-
-        scanned = text;
-        document.getElementById("result").innerText = text;
-
-        navigator.vibrate?.(200);
-      }
+        } catch (err) {
+            console.error(err);
+            alert("Camera Error: Please ensure you have granted permission.");
+        }
     }
-  );
-}
 
-// SAVE
-function save() {
+    function save() {
+        if (!scanned) {
+            alert("Scan something first!");
+            return;
+        }
 
-  if (!scanned) {
-    alert("Scan first!");
-    return;
-  }
+        const type = document.querySelector('input[name="type"]:checked').value;
+        const scriptUrl = "YOUR_GOOGLE_SCRIPT_URL_HERE"; 
 
-  const type = document.querySelector('input[name="type"]:checked').value;
+        const finalUrl = scriptUrl + 
+            "?assetType=" + encodeURIComponent(type) + 
+            "&serialNumber=" + encodeURIComponent(scanned);
 
-  let url = "https://script.google.com/macros/s/AKfycbwV72As_WKD5X1jXnVh20mA8Zh7xhu8IpSqF1To3zD-OnGg0317Z5jy31nyvS7Qr4Ffgw/exec"
-    + "?assetType=" + encodeURIComponent(type)
-    + "&serialNumber=" + encodeURIComponent(scanned);
-
-  let iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.src = url;
-  document.body.appendChild(iframe);
-
-  alert("✅ Saved");
-
-  scanned = "";
-  document.getElementById("result").innerText = "Waiting...";
-}
-
+        // Fetch is more reliable than iframes for data submission
+        fetch(finalUrl, { mode: 'no-cors' })
+            .then(() => {
+                alert("Saved successfully!");
+                scanned = "";
+                document.getElementById("result").innerText = "Waiting...";
+            })
+            .catch(e => alert("Save failed: " + e));
+    }
 </script>
 
 </body>
