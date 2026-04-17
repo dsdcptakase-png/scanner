@@ -3,6 +3,8 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<script src="https://unpkg.com/@zxing/browser@latest"></script>
+
 <style>
 body { margin:0; font-family:system-ui; background:#eef2f7; }
 
@@ -27,10 +29,12 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
   margin-bottom:10px;
 }
 
+/* slider */
 .switch {
   display:flex;
   background:#ddd;
   border-radius:30px;
+  overflow:hidden;
 }
 .switch input { display:none; }
 .switch label {
@@ -43,27 +47,46 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
   color:white;
 }
 
-input {
+/* CAMERA */
+video {
   width:100%;
-  padding:14px;
-  border-radius:10px;
-  border:1px solid #ccc;
-  font-size:16px;
+  height:220px;
+  object-fit:cover;
+  border-radius:12px;
+  background:black;
+}
+
+/* scan overlay */
+.overlay {
+  position:relative;
+}
+.box {
+  position:absolute;
+  border:3px solid white;
+  left:50%;
+  transform:translateX(-50%);
+}
+
+/* square QR */
+.qr { width:180px; height:180px; top:20px; }
+
+/* rectangle BAR */
+.bar { width:260px; height:90px; top:60px; }
+
+.result {
+  color:green;
+  font-weight:bold;
+  word-break:break-word;
 }
 
 button {
   width:100%;
-  padding:14px;
+  padding:12px;
   border:none;
   border-radius:10px;
   background:#0d6efd;
   color:white;
-  font-size:16px;
-}
-
-.result {
-  font-weight:bold;
-  color:green;
+  margin-top:6px;
 }
 </style>
 </head>
@@ -77,20 +100,38 @@ button {
 <!-- Asset -->
 <div class="card">
   <div class="switch">
-    <input type="radio" id="laptop" name="type" value="Laptop" checked>
+    <input type="radio" id="laptop" name="type" checked>
     <label for="laptop">Laptop</label>
 
-    <input type="radio" id="charger" name="type" value="Charger">
+    <input type="radio" id="charger" name="type">
     <label for="charger">Charger</label>
   </div>
 </div>
 
-<!-- Input -->
+<!-- Mode -->
 <div class="card">
-  <input type="text" id="code" placeholder="Scan and paste here">
+  <div class="switch">
+    <input type="radio" id="qr" name="mode">
+    <label for="qr">QR</label>
+
+    <input type="radio" id="bar" name="mode" checked>
+    <label for="bar">BAR</label>
+  </div>
 </div>
 
-<!-- Result -->
+<!-- CAMERA -->
+<div class="card overlay">
+  <video id="video"></video>
+  <div id="box" class="box bar"></div>
+</div>
+
+<!-- CONTROLS -->
+<div class="card">
+  Zoom:
+  <input type="range" id="zoom" min="1" max="4" step="0.1" value="1">
+  <button onclick="toggleFlash()">💡 Flash</button>
+</div>
+
 <div class="card result" id="result">Waiting...</div>
 
 <button onclick="save()">💾 Save</button>
@@ -99,36 +140,104 @@ button {
 
 <script>
 
-// show text
-document.getElementById("code").addEventListener("input", function() {
-  document.getElementById("result").innerText = this.value;
+let codeReader = new ZXing.BrowserMultiFormatReader();
+let selectedDeviceId;
+let scanned = "";
+let track;
+
+// START CAMERA
+ZXing.BrowserCodeReader.listVideoInputDevices()
+.then(devices => {
+  selectedDeviceId = devices[0].deviceId;
+  startScanner();
 });
 
-// SAVE (🔥 CORS FIXED METHOD)
-function save() {
+function startScanner() {
 
-  let scanned = document.getElementById("code").value;
+  codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result) => {
+
+    if (result) {
+      let text = result.getText();
+
+      if (text === scanned) return;
+
+      scanned = text;
+      document.getElementById("result").innerText = text;
+
+      navigator.vibrate?.(200);
+    }
+  });
+
+  setTimeout(() => {
+    track = document.querySelector("video").srcObject.getVideoTracks()[0];
+  }, 1000);
+}
+
+// ZOOM
+document.getElementById("zoom").addEventListener("input", (e)=>{
+  let z = parseFloat(e.target.value);
+
+  if (track) {
+    track.applyConstraints({
+      advanced: [{ zoom: z }]
+    }).catch(()=>{});
+  }
+});
+
+// FLASH
+let flash = false;
+function toggleFlash() {
+  flash = !flash;
+
+  if (track) {
+    track.applyConstraints({
+      advanced:[{torch:flash}]
+    }).catch(()=>alert("Flash not supported"));
+  }
+}
+
+// SWITCH MODE (QR / BAR)
+document.getElementById("qr").onchange = ()=>{
+  document.getElementById("box").className = "box qr";
+};
+
+document.getElementById("bar").onchange = ()=>{
+  document.getElementById("box").className = "box bar";
+};
+
+// AUTO SWITCH TYPE
+document.getElementById("laptop").onchange = ()=>{
+  document.getElementById("bar").checked = true;
+  document.getElementById("box").className = "box bar";
+};
+
+document.getElementById("charger").onchange = ()=>{
+  document.getElementById("qr").checked = true;
+  document.getElementById("box").className = "box qr";
+};
+
+// SAVE
+function save() {
 
   if (!scanned) {
     alert("Scan first!");
     return;
   }
 
-  const type = document.querySelector('input[name="type"]:checked').value;
+  const type = document.getElementById("laptop").checked ? "Laptop" : "Charger";
 
   let url = "https://script.google.com/macros/s/AKfycbwV72As_WKD5X1jXnVh20mA8Zh7xhu8IpSqF1To3zD-OnGg0317Z5jy31nyvS7Qr4Ffgw/exec"
     + "?assetType=" + encodeURIComponent(type)
     + "&serialNumber=" + encodeURIComponent(scanned);
 
-  // 🔥 IFRAME METHOD (NO FETCH ERROR)
   let iframe = document.createElement("iframe");
   iframe.style.display = "none";
   iframe.src = url;
   document.body.appendChild(iframe);
 
-  alert("✅ Saved");
+  alert("Saved");
 
-  document.getElementById("code").value = "";
+  scanned = "";
   document.getElementById("result").innerText = "Waiting...";
 }
 
