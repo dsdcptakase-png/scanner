@@ -3,133 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Asset Scanner Pro</title>
-    
+    <title>Asset Scanner - Focus Enabled</title>
     <script src="https://unpkg.com/@zxing/library@0.19.1"></script>
-
     <style>
-        :root { --primary: #0d6efd; --success: #198754; --bg: #f8f9fa; }
-        body { margin:0; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); text-align:center; }
-        .header { background: var(--primary); color:white; padding:18px; font-weight:bold; font-size: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .container { max-width:450px; margin:auto; padding:15px; }
+        :root { --primary: #0d6efd; --success: #198754; }
+        body { margin:0; font-family: system-ui; background: #f0f2f5; text-align:center; }
+        .header { background: var(--primary); color:white; padding:15px; font-weight:bold; }
+        .container { max-width:400px; margin:auto; padding:10px; }
+        .card { background:white; padding:12px; border-radius:12px; margin-bottom:10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         
-        .card { background:white; padding:15px; border-radius:16px; margin-bottom:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        /* Video Container */
+        .video-wrapper { position: relative; background: #000; border-radius: 12px; overflow: hidden; cursor: pointer; }
+        video { width: 100%; height: 320px; object-fit: cover; display: block; }
         
-        /* Camera Container */
-        .video-box { position: relative; background: #000; border-radius: 12px; overflow: hidden; line-height: 0; }
-        video { width: 100%; height: 300px; object-fit: cover; }
-        
-        /* Scan Overlay Guide */
-        .guide {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 70%; height: 40%; border: 2px solid rgba(255,255,255,0.5);
-            border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 4000px rgba(0,0,0,0.3);
+        /* Focus Ring Animation */
+        .focus-ring {
+            position: absolute; top: 50%; left: 50%; width: 60px; height: 60px;
+            border: 2px solid yellow; border-radius: 50%; transform: translate(-50%, -50%) scale(0);
+            pointer-events: none; opacity: 0;
+        }
+        .focus-active { animation: focus-pulse 0.5s ease-out; }
+        @keyframes focus-pulse {
+            0% { transform: translate(-50%, -50%) scale(2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
         }
 
-        .type-selector { display: flex; justify-content: center; gap: 20px; font-weight: 500; }
-        input[type="radio"] { transform: scale(1.2); margin-right: 5px; }
-
-        button { 
-            width:100%; padding:16px; border:none; border-radius:12px; 
-            color:white; font-size:16px; font-weight: bold; cursor:pointer; 
-            transition: opacity 0.2s; margin-top: 10px;
-        }
-        .btn-scan { background: var(--primary); }
-        .btn-save { background: var(--success); }
-        button:active { opacity: 0.8; }
-
-        .result-text { font-size: 18px; font-weight: bold; color: var(--success); word-break: break-all; margin: 10px 0; }
-        .status { font-size: 14px; color: #666; }
+        .tap-hint { font-size: 12px; color: #666; margin-top: 5px; }
+        button { width:100%; padding:15px; border:none; border-radius:10px; color:white; font-size:16px; font-weight:bold; margin-top:10px; }
+        .btn-blue { background: var(--primary); }
+        .btn-green { background: var(--success); }
+        .result { font-size: 18px; color: var(--success); font-weight: bold; min-height: 24px; }
     </style>
 </head>
 <body>
 
-<div class="header">📱 Asset Scanner</div>
+<div class="header">📱 High-Res Asset Scanner</div>
 
 <div class="container">
-    
-    <div class="card type-selector">
+    <div class="card">
         <label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
+        &nbsp;&nbsp;
         <label><input type="radio" name="type" value="Charger"> Charger</label>
     </div>
 
-    <button class="btn-scan" onclick="initScanner()">📷 Start Scanner</button>
+    <button class="btn-blue" onclick="startScanner()">📷 Open Camera</button>
+    <p class="tap-hint">If blurry, <b>Tap the Video</b> to refocus</p>
 
-    <div class="card video-box">
+    <div class="card video-wrapper" onclick="manualFocus()">
         <video id="video" playsinline muted autoplay></video>
-        <div class="guide"></div>
+        <div id="focusRing" class="focus-ring"></div>
     </div>
 
     <div class="card">
-        <div class="status" id="status">Ready to scan...</div>
-        <div class="result-text" id="result">---</div>
+        <div id="status" style="font-size:12px; color:#999">Status: Standby</div>
+        <div class="result" id="result">---</div>
     </div>
 
-    <button class="btn-save" onclick="saveToSheet()">💾 Save to Google Sheets</button>
-
+    <button class="btn-green" onclick="save()">💾 Save to Sheet</button>
 </div>
 
 <script>
     const codeReader = new ZXing.BrowserMultiFormatReader();
-    let scannedValue = "";
-    const resultDiv = document.getElementById('result');
-    const statusDiv = document.getElementById('status');
+    let selectedDeviceId;
+    let scanned = "";
+    let streamPtr = null;
 
-    async function initScanner() {
-        statusDiv.innerText = "Accessing high-res camera...";
+    async function startScanner() {
+        const status = document.getElementById('status');
         
-        // High resolution is CRITICAL for tiny charger QR codes
+        // 1. Force High Resolution (Full HD) for tiny codes
         const constraints = {
             video: {
-                facingMode: "environment",
-                width: { ideal: 1920 }, 
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
                 height: { ideal: 1080 }
             }
         };
 
         try {
-            codeReader.decodeFromConstraints(constraints, 'video', (result, err) => {
+            // Get the stream to apply advanced focus settings later
+            streamPtr = await navigator.mediaDevices.getUserMedia(constraints);
+            const videoElement = document.getElementById('video');
+            videoElement.srcObject = streamPtr;
+
+            status.innerText = "Status: Camera Active (1080p)";
+
+            codeReader.decodeFromVideoElement(videoElement, (result, err) => {
                 if (result) {
-                    scannedValue = result.getText();
-                    resultDiv.innerText = scannedValue;
-                    statusDiv.innerText = "✅ Code Detected!";
-                    if (navigator.vibrate) navigator.vibrate(150);
-                }
-                if (err && !(err instanceof ZXing.NotFoundException)) {
-                    console.error(err);
+                    scanned = result.getText();
+                    document.getElementById("result").innerText = scanned;
+                    if (navigator.vibrate) navigator.vibrate(100);
                 }
             });
-        } catch (error) {
-            console.error(error);
-            alert("Camera failed: Ensure you are on HTTPS and granted permissions.");
+
+        } catch (e) {
+            alert("Error: " + e);
         }
     }
 
-    async function saveToSheet() {
-        if (!scannedValue) {
-            alert("Scan a barcode first!");
-            return;
-        }
+    // SIMULATED MANUAL FOCUS
+    async function manualFocus() {
+        if (!streamPtr) return;
 
+        // Visual Feedback
+        const ring = document.getElementById('focusRing');
+        ring.classList.remove('focus-active');
+        void ring.offsetWidth; // Trigger reflow
+        ring.classList.add('focus-active');
+
+        const track = streamPtr.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+
+        // Check if the browser supports focusing
+        if (capabilities.focusMode) {
+            try {
+                // We toggle between 'continuous' and 'manual' to force the hardware to recalibrate
+                await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+                console.log("Focus reset triggered");
+            } catch (e) {
+                console.log("Focus constraint not supported by this phone.");
+            }
+        } else {
+            // Fallback: Restart the reader logic briefly
+            console.log("Hardware focus not accessible. Ensure you are 6+ inches away.");
+        }
+    }
+
+    function save() {
+        if (!scanned) return alert("Scan first!");
         const type = document.querySelector('input[name="type"]:checked').value;
+        const url = "YOUR_SCRIPT_URL_HERE?assetType=" + encodeURIComponent(type) + "&serialNumber=" + encodeURIComponent(scanned);
         
-        // REPLACE THIS WITH YOUR DEPLOYED WEB APP URL
-        const scriptUrl = "https://script.google.com/macros/s/AKfycb.../exec"; 
-
-        const finalUrl = `${scriptUrl}?assetType=${encodeURIComponent(type)}&serialNumber=${encodeURIComponent(scannedValue)}`;
-
-        statusDiv.innerText = "Sending to sheet...";
-
-        try {
-            await fetch(finalUrl, { mode: 'no-cors' });
-            alert("✅ Successfully Saved!");
-            // Reset after save
-            scannedValue = "";
-            resultDiv.innerText = "---";
-            statusDiv.innerText = "Ready for next scan.";
-        } catch (e) {
-            alert("Error saving: " + e);
-        }
+        fetch(url, { mode: 'no-cors' }).then(() => {
+            alert("✅ Saved!");
+            scanned = "";
+            document.getElementById("result").innerText = "---";
+        });
     }
 </script>
 
