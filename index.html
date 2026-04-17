@@ -8,203 +8,160 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: system-ui, sans-serif;
+    font-family: system-ui;
     background: #121212;
     color: white;
     text-align: center;
-    min-height: 100vh;
 }
 .container { max-width: 450px; margin: auto; padding: 15px; }
-h2 { margin-bottom: 15px; font-size: 20px; }
 
 .card {
     background: #1e1e1e;
-    padding: 15px;
-    border-radius: 15px;
-    margin-bottom: 15px;
-    border: 1px solid #333;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
 }
-
-.type-row { display: flex; justify-content: center; gap: 24px; }
-.type-row label { display: flex; align-items: center; gap: 6px; font-size: 15px; cursor: pointer; }
 
 .video-box {
     position: relative;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
-    background: #000;
-    margin-bottom: 10px;
 }
-video { width: 100%; height: 300px; object-fit: cover; display: block; }
+video { width: 100%; height: 300px; object-fit: cover; }
 
 .scan-frame {
     position: absolute;
     top: 30%; left: 10%;
     width: 80%; height: 40%;
     border: 2px solid rgba(255,255,255,0.5);
-    border-radius: 10px;
-    pointer-events: none;
 }
 .laser {
     position: absolute;
-    top: 50%; left: 5%;
-    width: 90%; height: 2px;
+    top: 50%;
+    width: 100%;
+    height: 2px;
     background: red;
     animation: blink 1s infinite;
-    pointer-events: none;
 }
-@keyframes blink { 50% { opacity: 0.15; } }
+@keyframes blink { 50% { opacity: 0.1; } }
 
-.status { font-size: 13px; color: #aaa; margin-bottom: 10px; min-height: 18px; }
-
-.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 button {
-    width: 100%; padding: 13px;
-    border: none; border-radius: 12px;
-    font-size: 15px; font-weight: bold; cursor: pointer;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    margin-top: 10px;
+    font-weight: bold;
 }
-.btn-blue  { background: #0d6efd; color: white; }
-.btn-gray  { background: #333; color: #ccc; }
+.btn-blue { background: #0d6efd; color: white; }
 .btn-green { background: #198754; color: white; }
 
-.zoom-label { font-size: 13px; color: #aaa; margin-bottom: 6px; display: block; }
-input[type=range] { width: 100%; accent-color: #0d6efd; }
-
-input[type=text] {
-    width: 100%; padding: 12px;
-    border-radius: 10px; border: 1px solid #444;
-    background: #252525; color: white; font-size: 15px;
-}
-input[type=text]::placeholder { color: #666; }
-
-.result-label { font-size: 12px; color: #888; margin-bottom: 6px; letter-spacing: 0.05em; }
 #result {
-    font-size: 22px; color: #4ade80;
-    font-weight: bold; word-break: break-all; min-height: 28px;
+    font-size: 20px;
+    color: #4ade80;
+    margin-top: 10px;
+}
+
+.type-row {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
 }
 </style>
 </head>
 
 <body>
+
 <div class="container">
 
-    <h2>📱 Asset Scanner PRO</h2>
+<h3>📱 Asset Scanner PRO</h3>
 
-    <div class="card">
-        <div class="type-row">
-            <label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
-            <label><input type="radio" name="type" value="Charger"> Charger</label>
-        </div>
-    </div>
+<div class="card type-row">
+<label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
+<label><input type="radio" name="type" value="Charger"> Charger</label>
+</div>
 
-    <div class="video-box">
-        <video id="video" autoplay muted playsinline></video>
-        <div class="scan-frame"></div>
-        <div class="laser"></div>
-    </div>
+<div class="video-box">
+    <video id="video" autoplay playsinline></video>
+    <div class="scan-frame"></div>
+    <div class="laser"></div>
+</div>
 
-    <div class="status" id="status">Starting camera...</div>
+<p id="status">Starting camera...</p>
 
-    <div class="btn-row">
-        <button class="btn-blue" onclick="startScanner()">🔄 Restart</button>
-        <button class="btn-gray" id="flashBtn" onclick="toggleFlash()">🔦 Flash</button>
-    </div>
+<button class="btn-blue" onclick="startScanner()">Restart</button>
 
-    <div class="card">
-        <span class="zoom-label">Zoom</span>
-        <input type="range" id="zoom" min="1" max="5" step="0.1" value="1">
-    </div>
+<div class="card">
+<input type="range" id="zoom" min="1" max="4" step="0.1" value="1">
+</div>
 
-    <div class="card">
-        <input type="text" id="manual" placeholder="Manual entry...">
-    </div>
+<div class="card">
+<input type="text" id="manual" placeholder="Manual entry">
+</div>
 
-    <div class="card">
-        <div class="result-label">SCANNED VALUE</div>
-        <div id="result">---</div>
-    </div>
+<div id="result">---</div>
 
-    <button class="btn-green" onclick="save()">💾 SAVE</button>
+<button class="btn-green" onclick="save()">SAVE</button>
 
 </div>
 
 <script>
-/* ── State ── */
 let selectedValue = "";
-let currentStream = null;
-let videoTrack    = null;
-let flashOn       = false;
-let scanInterval  = null;
+let videoTrack = null;
+let scanInterval = null;
 
-const video    = document.getElementById("video");
+const video = document.getElementById("video");
 const resultEl = document.getElementById("result");
 const statusEl = document.getElementById("status");
 
-function setStatus(msg) { statusEl.textContent = msg; }
+function setStatus(msg){ statusEl.textContent = msg; }
 
-/* ══════════════════════════════════════
-   ON SUCCESSFUL SCAN
-   ══════════════════════════════════════ */
-function onScanned(text) {
+function onScanned(text){
     if (!text || text === selectedValue) return;
     selectedValue = text;
     resultEl.textContent = text;
-    setStatus("✅ Scanned!");
-    if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+    setStatus("✅ Scanned");
 }
 
-/* ══════════════════════════════════════
-   METHOD 1 — Native BarcodeDetector
-   Best on Android Chrome & Samsung Browser
-   ══════════════════════════════════════ */
-let detector = null;
-
-async function tryNativeDetector() {
-    if (!("BarcodeDetector" in window)) return false;
-    try {
-        const supported = await BarcodeDetector.getSupportedFormats();
-        detector = new BarcodeDetector({ formats: supported });
-        return true;
-    } catch(e) { return false; }
-}
-
-function nativeLoop() {
-    if (!detector) return;
-    if (video.readyState >= 2 && video.videoWidth > 0) {
-        detector.detect(video).then(barcodes => {
-            if (barcodes.length > 0) onScanned(barcodes[0].rawValue);
-        }).catch(() => {});
-    }
-    requestAnimationFrame(nativeLoop);
-}
-
-/* ══════════════════════════════════════
-   METHOD 2 — Canvas + ZXing WASM
-   Fallback for iOS Safari & other browsers
-   ══════════════════════════════════════ */
-let zxingReader = null;
-let canvas, ctx;
-
-function loadZXing() {
-    return new Promise((resolve, reject) => {
-        if (window.ZXing) { resolve(); return; }
+/* LOAD ZXING */
+function loadZXing(){
+    return new Promise((resolve)=>{
+        if(window.ZXing){ resolve(); return; }
         const s = document.createElement("script");
         s.src = "https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js";
-        s.onload  = resolve;
-        s.onerror = reject;
+        s.onload = resolve;
         document.head.appendChild(s);
     });
 }
 
-async function initZXing() {
+async function startScanner(){
+
+    if(scanInterval) clearInterval(scanInterval);
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video:{
+            facingMode:"environment",
+            width:{ideal:1280},
+            height:{ideal:720}
+        }
+    });
+
+    video.srcObject = stream;
+    await video.play();
+    videoTrack = stream.getVideoTracks()[0];
+
+    setStatus("Camera ready");
+
     await loadZXing();
 
-    canvas = document.createElement("canvas");
-    ctx    = canvas.getContext("2d", { willReadFrequently: true });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d",{willReadFrequently:true});
 
     const hints = new Map();
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+
+    // ✅ BARCODE ONLY
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
         ZXing.BarcodeFormat.CODE_128,
         ZXing.BarcodeFormat.CODE_39,
         ZXing.BarcodeFormat.CODE_93,
@@ -212,142 +169,88 @@ async function initZXing() {
         ZXing.BarcodeFormat.EAN_8,
         ZXing.BarcodeFormat.UPC_A,
         ZXing.BarcodeFormat.UPC_E,
-        ZXing.BarcodeFormat.QR_CODE,
-        ZXing.BarcodeFormat.PDF_417,
-        ZXing.BarcodeFormat.DATA_MATRIX,
         ZXing.BarcodeFormat.ITF,
-        ZXing.BarcodeFormat.CODABAR,
-        ZXing.BarcodeFormat.AZTEC
+        ZXing.BarcodeFormat.CODABAR
     ]);
 
-    zxingReader = new ZXing.MultiFormatReader();
-    zxingReader.setHints(hints);
+    const reader = new ZXing.MultiFormatReader();
+    reader.setHints(hints);
 
-    setStatus("Scanner ready — point at barcode");
+    scanInterval = setInterval(()=>{
 
-    if (scanInterval) clearInterval(scanInterval);
-    scanInterval = setInterval(() => {
-        if (video.readyState < 2 || video.videoWidth === 0) return;
+        if(video.readyState !== 4) return;
 
-        canvas.width  = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
 
-        try {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const luminance = new ZXing.RGBLuminanceSource(
-                imageData.data, canvas.width, canvas.height
-            );
-            const bitmap  = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-            const decoded = zxingReader.decode(bitmap);
-            if (decoded) onScanned(decoded.getText());
-        } catch(e) {
-            // NotFoundException on every empty frame — safe to ignore
-        }
-    }, 200);
+        // ✅ SCAN ONLY INSIDE BOX
+        const x = vw * 0.1;
+        const y = vh * 0.3;
+        const w = vw * 0.8;
+        const h = vh * 0.4;
+
+        canvas.width = w;
+        canvas.height = h;
+
+        ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
+
+        try{
+            const img = ctx.getImageData(0,0,w,h);
+            const source = new ZXing.RGBLuminanceSource(img.data,w,h);
+            const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+            const result = reader.decode(bitmap);
+
+            if(result) onScanned(result.getText());
+
+        }catch(e){}
+
+    },200);
 }
 
-/* ══════════════════════════════════════
-   CAMERA START
-   ══════════════════════════════════════ */
-async function startScanner() {
-
-    // Stop old scan loop
-    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-    detector = null;
-
-    // Stop old stream
-    if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); }
-    currentStream = null; videoTrack = null;
-    flashOn = false;
-    document.getElementById("flashBtn").textContent = "🔦 Flash";
-
-    setStatus("Requesting camera...");
-
-    try {
-        currentStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: { ideal: "environment" },
-                width:  { ideal: 1920 },
-                height: { ideal: 1080 }
-            }
-        });
-
-        video.srcObject = currentStream;
-        await video.play();
-        videoTrack = currentStream.getVideoTracks()[0];
-
-        setStatus("Camera on — loading scanner...");
-
-        // Try native first, fall back to ZXing canvas
-        const hasNative = await tryNativeDetector();
-        if (hasNative) {
-            setStatus("Scanner ready — point at barcode");
-            nativeLoop();
-        } else {
-            await initZXing();
-        }
-
-    } catch(err) {
-        setStatus("Camera error: " + err.message);
-    }
-}
-
-/* ══════════════════════════════════════
-   FLASH
-   ══════════════════════════════════════ */
-function toggleFlash() {
-    if (!videoTrack) { setStatus("Start camera first"); return; }
-    const cap = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-    if (!cap.torch) { setStatus("Flash not supported on this device"); return; }
-    flashOn = !flashOn;
-    videoTrack.applyConstraints({ advanced: [{ torch: flashOn }] });
-    document.getElementById("flashBtn").textContent = flashOn ? "🔦 ON" : "🔦 Flash";
-}
-
-/* ══════════════════════════════════════
-   ZOOM
-   ══════════════════════════════════════ */
-document.getElementById("zoom").addEventListener("input", function () {
-    if (!videoTrack) return;
-    const cap = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-    if (cap.zoom) {
-        videoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(this.value) }] });
+/* ZOOM */
+document.getElementById("zoom").addEventListener("input",function(){
+    if(!videoTrack) return;
+    const cap = videoTrack.getCapabilities();
+    if(cap.zoom){
+        videoTrack.applyConstraints({advanced:[{zoom:parseFloat(this.value)}]});
     }
 });
 
-/* ══════════════════════════════════════
-   MANUAL ENTRY
-   ══════════════════════════════════════ */
-document.getElementById("manual").addEventListener("input", function () {
+/* MANUAL */
+document.getElementById("manual").addEventListener("input",function(){
     selectedValue = this.value;
-    resultEl.textContent = this.value || "---";
+    resultEl.textContent = this.value;
 });
 
-/* ══════════════════════════════════════
-   SAVE
-   ══════════════════════════════════════ */
-function save() {
-    if (!selectedValue) { alert("No data to save"); return; }
-    const type      = document.querySelector('input[name="type"]:checked').value;
-    const scriptUrl = "YOUR_APPS_SCRIPT_URL";   // ← replace this
+/* SAVE TO GOOGLE SHEET */
+function save(){
 
-    fetch(`${scriptUrl}?type=${encodeURIComponent(type)}&serial=${encodeURIComponent(selectedValue)}`, {
-        mode: "no-cors"
-    }).catch(() => {});
+    if(!selectedValue){
+        alert("No data to save");
+        return;
+    }
 
-    alert("Saved ✅  " + type + " — " + selectedValue);
+    const type = document.querySelector('input[name="type"]:checked').value;
+
+    const url = "https://script.google.com/macros/s/AKfycbwV72As_WKD5X1jXnVh20mA8Zh7xhu8IpSqF1To3zD-OnGg0317Z5jy31nyvS7Qr4Ffgw/exec";
+
+    const fullUrl = `${url}?type=${encodeURIComponent(type)}&serial=${encodeURIComponent(selectedValue)}`;
+
+    fetch(fullUrl)
+    .then(()=>{
+        alert("✅ Saved to Google Sheet");
+    })
+    .catch(()=>{
+        alert("⚠️ Saved (no response)");
+    });
 
     selectedValue = "";
     resultEl.textContent = "---";
     document.getElementById("manual").value = "";
-    setStatus("Ready — point at next barcode");
 }
 
-/* ══════════════════════════════════════
-   AUTO START
-   ══════════════════════════════════════ */
-window.addEventListener("load", () => setTimeout(startScanner, 400));
+startScanner();
 </script>
+
 </body>
 </html>
