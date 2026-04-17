@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body { margin:0; font-family:system-ui; background:#eef2f7; }
+
+.header {
+  background:#0d6efd; color:white; padding:15px;
+  text-align:center; font-weight:bold;
+}
+
+.container { max-width:480px; margin:auto; padding:10px; }
+
+.card {
+  background:white; padding:14px; border-radius:14px;
+  margin-bottom:10px;
+}
+
+#reader { width:100%; }
+
+/* SLIDER */
+.switch {
+  display:flex; background:#ddd; border-radius:30px; overflow:hidden;
+}
+.switch input { display:none; }
+.switch label {
+  flex:1; padding:10px; text-align:center;
+}
+.switch input:checked + label {
+  background:#0d6efd; color:white;
+}
+
+button {
+  width:100%; padding:14px;
+  border:none; border-radius:10px;
+  background:#0d6efd; color:white;
+  margin-top:8px;
+}
+
+.result { font-weight:bold; color:green; }
+
+.mode {
+  display:flex; gap:5px;
+}
+.mode button {
+  flex:1;
+}
+.active { background:#28a745 !important; }
+
+</style>
+</head>
+
+<body>
+
+<div class="header">📱 Asset Scanner Pro</div>
+
+<div class="container">
+
+<!-- MODE -->
+<div class="card mode">
+  <button id="saveBtn" onclick="setMode('save')" class="active">Save</button>
+  <button id="searchBtn" onclick="setMode('search')">Search</button>
+  <button id="bulkBtn" onclick="setMode('bulk')">Bulk</button>
+</div>
+
+<!-- SLIDER -->
+<div class="card">
+  <div class="switch">
+    <input type="radio" id="laptop" name="type" value="Laptop" checked>
+    <label for="laptop">Laptop</label>
+
+    <input type="radio" id="charger" name="type" value="Charger">
+    <label for="charger">Charger</label>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div class="card">
+  <div id="reader"></div>
+  <button onclick="toggleTorch()">💡 Flash</button>
+</div>
+
+<!-- RESULT -->
+<div class="card">
+  <div id="result">Waiting...</div>
+</div>
+
+<button onclick="process()">▶ Process</button>
+
+</div>
+
+<script>
+
+let scanner;
+let scanned = "";
+let mode = "save";
+let torch = false;
+
+// MODE SWITCH
+function setMode(m) {
+  mode = m;
+
+  document.querySelectorAll(".mode button").forEach(b=>b.classList.remove("active"));
+  document.getElementById(m+"Btn").classList.add("active");
+}
+
+// START CAMERA
+function start() {
+
+  scanner = new Html5Qrcode("reader");
+
+  Html5Qrcode.getCameras().then(devices => {
+
+    let back = devices.find(d => d.label.toLowerCase().includes("back"));
+
+    scanner.start(
+      back ? back.id : devices[0].id,
+      { fps:10, qrbox:250 },
+      (text) => {
+
+        scanned = text;
+        document.getElementById("result").innerText = text;
+
+        if (mode === "bulk") process(); // auto process in bulk
+      }
+    );
+
+  });
+}
+
+// FLASH
+function toggleTorch() {
+  torch = !torch;
+
+  scanner.applyVideoConstraints({
+    advanced:[{torch:torch}]
+  }).catch(()=>alert("Flash not supported"));
+}
+
+// PROCESS
+function process() {
+
+  if (!scanned) return alert("Scan first");
+
+  const type = document.querySelector('input[name="type"]:checked').value;
+
+  if (mode === "search") {
+
+    fetch("https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec", {
+      method:"POST",
+      body: JSON.stringify({
+        action:"search",
+        serialNumber: scanned
+      })
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if(res.status==="found"){
+        alert("Found:\n"+res.data.join(" | "));
+      } else {
+        alert("Not Found");
+      }
+    });
+
+  } else {
+
+    fetch("YOUR_SCRIPT_URL", {
+      method:"POST",
+      body: JSON.stringify({
+        action:"save",
+        assetType:type,
+        serialNumber:scanned
+      })
+    })
+    .then(r=>r.json())
+    .then(res=>{
+
+      if(res.status==="duplicate"){
+        alert("Duplicate!");
+        return;
+      }
+
+      alert("Saved: "+res.assetNumber);
+
+    });
+  }
+}
+
+// START
+start();
+
+</script>
+
+</body>
+</html>
