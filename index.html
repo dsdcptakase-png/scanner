@@ -47,7 +47,7 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
   color:white;
 }
 
-/* CAMERA */
+/* camera */
 video {
   width:100%;
   height:220px;
@@ -56,10 +56,9 @@ video {
   background:black;
 }
 
-/* scan overlay */
-.overlay {
-  position:relative;
-}
+/* overlay */
+.overlay { position:relative; }
+
 .box {
   position:absolute;
   border:3px solid white;
@@ -67,10 +66,10 @@ video {
   transform:translateX(-50%);
 }
 
-/* square QR */
+/* QR square */
 .qr { width:180px; height:180px; top:20px; }
 
-/* rectangle BAR */
+/* BAR rectangle */
 .bar { width:260px; height:90px; top:60px; }
 
 .result {
@@ -97,13 +96,13 @@ button {
 
 <div class="container">
 
-<!-- Asset -->
+<!-- Asset Type -->
 <div class="card">
   <div class="switch">
-    <input type="radio" id="laptop" name="type" checked>
+    <input type="radio" id="laptop" checked>
     <label for="laptop">Laptop</label>
 
-    <input type="radio" id="charger" name="type">
+    <input type="radio" id="charger">
     <label for="charger">Charger</label>
   </div>
 </div>
@@ -111,92 +110,82 @@ button {
 <!-- Mode -->
 <div class="card">
   <div class="switch">
-    <input type="radio" id="qr" name="mode">
+    <input type="radio" id="qr">
     <label for="qr">QR</label>
 
-    <input type="radio" id="bar" name="mode" checked>
+    <input type="radio" id="bar" checked>
     <label for="bar">BAR</label>
   </div>
 </div>
 
-<!-- CAMERA -->
+<!-- Start Camera -->
+<button onclick="startCamera()">📷 Start Camera</button>
+
+<!-- Camera -->
 <div class="card overlay">
   <video id="video"></video>
   <div id="box" class="box bar"></div>
 </div>
 
-<!-- CONTROLS -->
-<div class="card">
-  Zoom:
-  <input type="range" id="zoom" min="1" max="4" step="0.1" value="1">
-  <button onclick="toggleFlash()">💡 Flash</button>
-</div>
-
+<!-- Result -->
 <div class="card result" id="result">Waiting...</div>
 
+<!-- Save -->
 <button onclick="save()">💾 Save</button>
 
 </div>
 
 <script>
 
-let codeReader = new ZXing.BrowserMultiFormatReader();
-let selectedDeviceId;
+let codeReader;
 let scanned = "";
 let track;
 
 // START CAMERA
-ZXing.BrowserCodeReader.listVideoInputDevices()
-.then(devices => {
-  selectedDeviceId = devices[0].deviceId;
-  startScanner();
-});
+function startCamera() {
 
-function startScanner() {
+  codeReader = new ZXing.BrowserMultiFormatReader();
 
-  codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result) => {
+  ZXing.BrowserCodeReader.listVideoInputDevices()
+  .then(devices => {
 
-    if (result) {
-      let text = result.getText();
+    let backCam = devices.find(d =>
+      d.label.toLowerCase().includes("back") ||
+      d.label.toLowerCase().includes("environment")
+    );
 
-      if (text === scanned) return;
+    let deviceId = backCam ? backCam.deviceId : devices[0].deviceId;
 
-      scanned = text;
-      document.getElementById("result").innerText = text;
+    codeReader.decodeFromVideoDevice(deviceId, 'video', (result) => {
 
-      navigator.vibrate?.(200);
-    }
+      if (result) {
+
+        let text = result.getText();
+
+        if (text === scanned) return;
+
+        scanned = text;
+        document.getElementById("result").innerText = text;
+
+        navigator.vibrate?.(200);
+      }
+    });
+
+    // get track
+    setTimeout(() => {
+      let video = document.getElementById("video");
+      if (video.srcObject) {
+        track = video.srcObject.getVideoTracks()[0];
+      }
+    }, 1000);
+
+  })
+  .catch(err => {
+    alert("Camera error: " + err);
   });
-
-  setTimeout(() => {
-    track = document.querySelector("video").srcObject.getVideoTracks()[0];
-  }, 1000);
 }
 
-// ZOOM
-document.getElementById("zoom").addEventListener("input", (e)=>{
-  let z = parseFloat(e.target.value);
-
-  if (track) {
-    track.applyConstraints({
-      advanced: [{ zoom: z }]
-    }).catch(()=>{});
-  }
-});
-
-// FLASH
-let flash = false;
-function toggleFlash() {
-  flash = !flash;
-
-  if (track) {
-    track.applyConstraints({
-      advanced:[{torch:flash}]
-    }).catch(()=>alert("Flash not supported"));
-  }
-}
-
-// SWITCH MODE (QR / BAR)
+// MODE SWITCH
 document.getElementById("qr").onchange = ()=>{
   document.getElementById("box").className = "box qr";
 };
@@ -205,7 +194,7 @@ document.getElementById("bar").onchange = ()=>{
   document.getElementById("box").className = "box bar";
 };
 
-// AUTO SWITCH TYPE
+// AUTO TYPE SWITCH
 document.getElementById("laptop").onchange = ()=>{
   document.getElementById("bar").checked = true;
   document.getElementById("box").className = "box bar";
@@ -230,12 +219,13 @@ function save() {
     + "?assetType=" + encodeURIComponent(type)
     + "&serialNumber=" + encodeURIComponent(scanned);
 
+  // iframe save (no CORS issue)
   let iframe = document.createElement("iframe");
   iframe.style.display = "none";
   iframe.src = url;
   document.body.appendChild(iframe);
 
-  alert("Saved");
+  alert("✅ Saved");
 
   scanned = "";
   document.getElementById("result").innerText = "Waiting...";
