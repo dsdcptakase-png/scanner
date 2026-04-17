@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body { font-family:system-ui; background:#eef2f7; margin:0; }
+body { margin:0; font-family:system-ui; background:#eef2f7; }
 
 .header {
   background:#0d6efd;
@@ -74,6 +74,7 @@ button {
 
 <div class="container">
 
+<!-- Asset -->
 <div class="card">
   <div class="switch">
     <input type="radio" id="laptop" name="type" value="Laptop" checked>
@@ -84,10 +85,12 @@ button {
   </div>
 </div>
 
+<!-- Input -->
 <div class="card">
-  <input type="text" id="code" placeholder="Scan using external scanner & paste here">
+  <input type="text" id="code" placeholder="Scan and paste here">
 </div>
 
+<!-- Result -->
 <div class="card result" id="result">Waiting...</div>
 
 <button onclick="save()">💾 Save</button>
@@ -96,10 +99,12 @@ button {
 
 <script>
 
+// show text
 document.getElementById("code").addEventListener("input", function() {
   document.getElementById("result").innerText = this.value;
 });
 
+// SAVE (🔥 CORS FIXED METHOD)
 function save() {
 
   let scanned = document.getElementById("code").value;
@@ -111,20 +116,20 @@ function save() {
 
   const type = document.querySelector('input[name="type"]:checked').value;
 
-  let url = "https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec"
+  let url = "https://script.google.com/macros/s/AKfycbwV72As_WKD5X1jXnVh20mA8Zh7xhu8IpSqF1To3zD-OnGg0317Z5jy31nyvS7Qr4Ffgw/exec"
     + "?assetType=" + encodeURIComponent(type)
     + "&serialNumber=" + encodeURIComponent(scanned);
 
-  fetch(url)
-    .then(res => res.text())
-    .then(msg => {
-      alert(msg);
-      document.getElementById("code").value = "";
-      document.getElementById("result").innerText = "Waiting...";
-    })
-    .catch(err => {
-      alert("Error saving: " + err);
-    });
+  // 🔥 IFRAME METHOD (NO FETCH ERROR)
+  let iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = url;
+  document.body.appendChild(iframe);
+
+  alert("✅ Saved");
+
+  document.getElementById("code").value = "";
+  document.getElementById("result").innerText = "Waiting...";
 }
 
 </script>
