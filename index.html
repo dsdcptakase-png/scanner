@@ -9,72 +9,85 @@
 body { margin:0; font-family:system-ui; background:#eef2f7; }
 
 .header {
-  background:#0d6efd; color:white; padding:15px;
-  text-align:center; font-weight:bold;
+  background:#0d6efd; color:white;
+  padding:15px; text-align:center;
+  font-weight:bold;
 }
 
 .container { max-width:480px; margin:auto; padding:10px; }
 
 .card {
-  background:white; padding:14px; border-radius:14px;
-  margin-bottom:10px;
+  background:white; padding:14px;
+  border-radius:14px; margin-bottom:10px;
 }
-
-#reader { width:100%; }
 
 /* SLIDER */
 .switch {
-  display:flex; background:#ddd; border-radius:30px; overflow:hidden;
+  display:flex;
+  background:#ddd;
+  border-radius:30px;
+  overflow:hidden;
 }
 .switch input { display:none; }
 .switch label {
-  flex:1; padding:10px; text-align:center;
+  flex:1;
+  padding:10px;
+  text-align:center;
 }
 .switch input:checked + label {
-  background:#0d6efd; color:white;
+  background:#0d6efd;
+  color:white;
 }
 
 button {
-  width:100%; padding:14px;
-  border:none; border-radius:10px;
-  background:#0d6efd; color:white;
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:10px;
+  background:#0d6efd;
+  color:white;
   margin-top:8px;
 }
 
-.result { font-weight:bold; color:green; }
-
-.mode {
-  display:flex; gap:5px;
+.result {
+  font-weight:bold;
+  color:green;
+  word-break:break-word;
 }
-.mode button {
-  flex:1;
-}
-.active { background:#28a745 !important; }
 
+#reader {
+  width:100%;
+}
 </style>
 </head>
 
 <body>
 
-<div class="header">📱 Asset Scanner Pro</div>
+<div class="header">📱 Smart Asset Scanner</div>
 
 <div class="container">
 
-<!-- MODE -->
-<div class="card mode">
-  <button id="saveBtn" onclick="setMode('save')" class="active">Save</button>
-  <button id="searchBtn" onclick="setMode('search')">Search</button>
-  <button id="bulkBtn" onclick="setMode('bulk')">Bulk</button>
-</div>
-
-<!-- SLIDER -->
+<!-- ASSET TYPE -->
 <div class="card">
+  <b>Asset Type</b>
   <div class="switch">
     <input type="radio" id="laptop" name="type" value="Laptop" checked>
     <label for="laptop">Laptop</label>
 
     <input type="radio" id="charger" name="type" value="Charger">
     <label for="charger">Charger</label>
+  </div>
+</div>
+
+<!-- SCAN MODE -->
+<div class="card">
+  <b>Scan Mode</b>
+  <div class="switch">
+    <input type="radio" id="qr" name="scanMode" value="qr">
+    <label for="qr">QR</label>
+
+    <input type="radio" id="bar" name="scanMode" value="bar">
+    <label for="bar">BAR</label>
   </div>
 </div>
 
@@ -86,10 +99,10 @@ button {
 
 <!-- RESULT -->
 <div class="card">
-  <div id="result">Waiting...</div>
+  <div id="result" class="result">Waiting...</div>
 </div>
 
-<button onclick="process()">▶ Process</button>
+<button onclick="save()">💾 Save</button>
 
 </div>
 
@@ -97,42 +110,82 @@ button {
 
 let scanner;
 let scanned = "";
-let mode = "save";
 let torch = false;
 
-// MODE SWITCH
-function setMode(m) {
-  mode = m;
+// 🔊 beep
+const beep = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
 
-  document.querySelectorAll(".mode button").forEach(b=>b.classList.remove("active"));
-  document.getElementById(m+"Btn").classList.add("active");
+// 🔁 START SCANNER
+function startScanner() {
+
+  if (scanner) {
+    scanner.stop().then(()=>initScanner());
+  } else {
+    initScanner();
+  }
 }
 
-// START CAMERA
-function start() {
+function initScanner() {
 
   scanner = new Html5Qrcode("reader");
 
+  const mode = document.querySelector('input[name="scanMode"]:checked').value;
+
+  let config;
+
+  if (mode === "qr") {
+    config = {
+      fps: 20,
+      qrbox: { width: 250, height: 250 } // 🔲 square
+    };
+  } else {
+    config = {
+      fps: 20,
+      qrbox: { width: 300, height: 120 } // ▭ rectangle
+    };
+  }
+
   Html5Qrcode.getCameras().then(devices => {
 
-    let back = devices.find(d => d.label.toLowerCase().includes("back"));
+    let back = devices.find(d =>
+      d.label.toLowerCase().includes("back") ||
+      d.label.toLowerCase().includes("environment")
+    );
 
     scanner.start(
       back ? back.id : devices[0].id,
-      { fps:10, qrbox:250 },
+      config,
       (text) => {
+
+        if (text === scanned) return;
 
         scanned = text;
         document.getElementById("result").innerText = text;
 
-        if (mode === "bulk") process(); // auto process in bulk
+        navigator.vibrate?.(200);
+        beep.play();
       }
     );
 
   });
 }
 
-// FLASH
+// 🔥 AUTO SWITCH BASED ON ASSET TYPE
+document.getElementById("laptop").addEventListener("change", () => {
+  document.getElementById("bar").checked = true;
+  startScanner();
+});
+
+document.getElementById("charger").addEventListener("change", () => {
+  document.getElementById("qr").checked = true;
+  startScanner();
+});
+
+// 🔄 MANUAL MODE CHANGE
+document.getElementById("qr").addEventListener("change", startScanner);
+document.getElementById("bar").addEventListener("change", startScanner);
+
+// 💡 FLASH
 function toggleTorch() {
   torch = !torch;
 
@@ -141,57 +194,42 @@ function toggleTorch() {
   }).catch(()=>alert("Flash not supported"));
 }
 
-// PROCESS
-function process() {
+// 💾 SAVE
+function save() {
 
-  if (!scanned) return alert("Scan first");
+  if (!scanned) {
+    alert("Scan first!");
+    return;
+  }
 
   const type = document.querySelector('input[name="type"]:checked').value;
 
-  if (mode === "search") {
-
-    fetch("https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec", {
-      method:"POST",
-      body: JSON.stringify({
-        action:"search",
-        serialNumber: scanned
-      })
+  fetch("https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec", {
+    method:"POST",
+    body: JSON.stringify({
+      action:"save",
+      assetType:type,
+      serialNumber:scanned
     })
-    .then(r=>r.json())
-    .then(res=>{
-      if(res.status==="found"){
-        alert("Found:\n"+res.data.join(" | "));
-      } else {
-        alert("Not Found");
-      }
-    });
+  })
+  .then(r=>r.json())
+  .then(res=>{
 
-  } else {
+    if(res.status==="duplicate"){
+      alert("Duplicate!");
+      return;
+    }
 
-    fetch("YOUR_SCRIPT_URL", {
-      method:"POST",
-      body: JSON.stringify({
-        action:"save",
-        assetType:type,
-        serialNumber:scanned
-      })
-    })
-    .then(r=>r.json())
-    .then(res=>{
+    alert("Saved: " + res.assetNumber);
 
-      if(res.status==="duplicate"){
-        alert("Duplicate!");
-        return;
-      }
-
-      alert("Saved: "+res.assetNumber);
-
-    });
-  }
+    scanned = "";
+    document.getElementById("result").innerText = "Waiting...";
+  });
 }
 
-// START
-start();
+// 🚀 START DEFAULT
+document.getElementById("bar").checked = true; // Laptop default
+startScanner();
 
 </script>
 
