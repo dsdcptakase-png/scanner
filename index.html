@@ -6,22 +6,30 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-body { margin:0; font-family:system-ui; background:#eef2f7; }
+body {
+  margin:0;
+  font-family:system-ui;
+  background:#eef2f7;
+}
 
+/* HEADER */
 .header {
   background:#0d6efd;
   color:white;
   padding:12px;
   text-align:center;
   font-weight:bold;
+  font-size:18px;
 }
 
+/* CONTAINER */
 .container {
   max-width:420px;
   margin:auto;
   padding:8px;
 }
 
+/* CARD */
 .card {
   background:white;
   padding:10px;
@@ -29,7 +37,7 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
   margin-bottom:8px;
 }
 
-/* slider */
+/* SLIDER */
 .switch {
   display:flex;
   background:#ddd;
@@ -37,16 +45,44 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
   overflow:hidden;
 }
 .switch input { display:none; }
+
 .switch label {
   flex:1;
   padding:8px;
   text-align:center;
+  font-size:14px;
 }
+
 .switch input:checked + label {
   background:#0d6efd;
   color:white;
 }
 
+/* CAMERA FIX */
+#reader {
+  width:100%;
+  height:200px;
+  position:relative;
+  overflow:hidden;
+  border-radius:12px;
+  background:black;
+}
+
+#reader video {
+  width:100% !important;
+  height:100% !important;
+  object-fit:cover;
+}
+
+/* RESULT */
+.result {
+  font-size:14px;
+  color:green;
+  font-weight:bold;
+  word-break:break-word;
+}
+
+/* BUTTON */
 button {
   width:100%;
   padding:12px;
@@ -54,21 +90,8 @@ button {
   border-radius:10px;
   background:#0d6efd;
   color:white;
-  margin-top:6px;
+  font-size:15px;
 }
-
-/* 🔥 SMALL CAMERA */
-#reader {
-  width:100%;
-  height:220px;
-}
-
-.result {
-  font-weight:bold;
-  color:green;
-  font-size:14px;
-}
-
 </style>
 </head>
 
@@ -78,7 +101,7 @@ button {
 
 <div class="container">
 
-<!-- Asset -->
+<!-- Asset Type -->
 <div class="card">
   <div class="switch">
     <input type="radio" id="laptop" name="type" value="Laptop" checked>
@@ -89,7 +112,7 @@ button {
   </div>
 </div>
 
-<!-- Mode -->
+<!-- Scan Mode -->
 <div class="card">
   <div class="switch">
     <input type="radio" id="qr" name="mode" value="qr">
@@ -100,12 +123,15 @@ button {
   </div>
 </div>
 
+<!-- CAMERA -->
 <div class="card">
   <div id="reader"></div>
 </div>
 
+<!-- RESULT -->
 <div class="card result" id="result">Waiting...</div>
 
+<!-- SAVE -->
 <button onclick="save()">💾 Save</button>
 
 </div>
@@ -115,10 +141,11 @@ button {
 let scanner;
 let scanned = "";
 
+// 🔊 beep
 const beep = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
 
+// START
 function startScanner() {
-
   if (scanner) {
     scanner.stop().then(init);
   } else {
@@ -133,12 +160,15 @@ function init() {
   const mode = document.querySelector('input[name="mode"]:checked').value;
 
   let config = mode === "qr"
-    ? { fps:15, qrbox:{width:220,height:220} }
-    : { fps:15, qrbox:{width:300,height:100} };
+    ? { fps: 15, qrbox: 180 } // square
+    : { fps: 15, qrbox: { width: 250, height: 80 } }; // rectangle
 
   Html5Qrcode.getCameras().then(devices => {
 
-    let cam = devices.find(d => d.label.toLowerCase().includes("back"));
+    let cam = devices.find(d =>
+      d.label.toLowerCase().includes("back") ||
+      d.label.toLowerCase().includes("environment")
+    );
 
     scanner.start(
       cam ? cam.id : devices[0].id,
@@ -158,7 +188,7 @@ function init() {
   });
 }
 
-// auto switch
+// AUTO SWITCH
 document.getElementById("laptop").onchange = ()=>{
   document.getElementById("bar").checked = true;
   startScanner();
@@ -172,7 +202,7 @@ document.getElementById("charger").onchange = ()=>{
 document.getElementById("qr").onchange = startScanner;
 document.getElementById("bar").onchange = startScanner;
 
-// SAVE (🔥 FIXED)
+// SAVE (WORKING METHOD)
 function save() {
 
   if (!scanned) {
@@ -189,14 +219,15 @@ function save() {
   fetch(url)
     .then(res => res.text())
     .then(msg => {
-      alert(msg); // shows Saved / Duplicate
+
+      alert(msg); // Saved / Duplicate
 
       scanned = "";
       document.getElementById("result").innerText = "Waiting...";
     });
 }
 
-// start
+// START APP
 startScanner();
 
 </script>
