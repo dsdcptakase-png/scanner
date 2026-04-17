@@ -5,245 +5,341 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Asset Scanner PRO</title>
 
-<script src="https://unpkg.com/@zxing/library@0.19.1"></script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 
 <style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-    margin:0;
-    font-family: system-ui;
-    background:#121212;
-    color:white;
-    text-align:center;
+    font-family: system-ui, sans-serif;
+    background: #121212;
+    color: white;
+    text-align: center;
+    min-height: 100vh;
 }
+
 .container {
-    max-width:450px;
-    margin:auto;
-    padding:15px;
+    max-width: 450px;
+    margin: auto;
+    padding: 15px;
 }
+
+h2 {
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
 .card {
-    background:#1e1e1e;
-    padding:15px;
-    border-radius:15px;
-    margin-bottom:15px;
-    border:1px solid #333;
+    background: #1e1e1e;
+    padding: 15px;
+    border-radius: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #333;
 }
+
+/* Radio buttons */
+.type-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+}
+
+.type-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+/* Video box */
 .video-box {
-    position:relative;
-    border-radius:12px;
-    overflow:hidden;
-    background:#000;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    margin-bottom: 10px;
 }
+
 video {
-    width:100%;
-    height:300px;
-    object-fit:cover;
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+    display: block;
 }
 
-/* Scan Area */
-.video-box::after {
-    content:"";
-    position:absolute;
-    top:35%;
-    left:10%;
-    width:80%;
-    height:30%;
-    border:2px solid rgba(255,255,255,0.4);
-    border-radius:10px;
+/* Scan frame overlay */
+.scan-frame {
+    position: absolute;
+    top: 30%;
+    left: 10%;
+    width: 80%;
+    height: 40%;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 10px;
+    pointer-events: none;
 }
 
-/* Laser */
+/* Laser line */
 .laser {
-    position:absolute;
-    top:50%;
-    left:5%;
-    width:90%;
-    height:2px;
-    background:red;
-    animation:blink 1s infinite;
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    width: 90%;
+    height: 2px;
+    background: red;
+    animation: blink 1s infinite;
+    pointer-events: none;
 }
-@keyframes blink {50%{opacity:0.3;}}
+
+@keyframes blink {
+    50% { opacity: 0.2; }
+}
+
+/* Status */
+.status {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 10px;
+    min-height: 18px;
+}
+
+/* Buttons */
+.btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
 
 button {
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:12px;
-    font-size:16px;
-    margin-top:8px;
-    font-weight:bold;
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
 }
-.btn-blue {background:#0d6efd;color:white;}
-.btn-green {background:#198754;color:white;}
-.btn-gray {background:#333;color:#ccc;}
 
+.btn-blue  { background: #0d6efd; color: white; }
+.btn-gray  { background: #333;    color: #ccc;   }
+.btn-green { background: #198754; color: white;  }
+
+/* Zoom slider */
+.zoom-label {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 6px;
+    display: block;
+}
+
+input[type=range] {
+    width: 100%;
+    accent-color: #0d6efd;
+}
+
+/* Manual input */
 input[type=text] {
-    width:100%;
-    padding:12px;
-    border-radius:10px;
-    border:1px solid #444;
-    background:#252525;
-    color:white;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #444;
+    background: #252525;
+    color: white;
+    font-size: 15px;
+}
+
+input[type=text]::placeholder {
+    color: #666;
+}
+
+/* Result */
+.result-label {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 6px;
+    letter-spacing: 0.05em;
 }
 
 #result {
-    font-size:22px;
-    color:#4ade80;
-    font-weight:bold;
-    margin-top:10px;
+    font-size: 22px;
+    color: #4ade80;
+    font-weight: bold;
+    word-break: break-all;
+    min-height: 28px;
 }
 </style>
 </head>
 
 <body>
-
 <div class="container">
 
-<h2>📱 Asset Scanner PRO</h2>
+    <h2>📱 Asset Scanner PRO</h2>
 
-<div class="card">
-<label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
-&nbsp;&nbsp;
-<label><input type="radio" name="type" value="Charger"> Charger</label>
-</div>
+    <!-- Asset Type -->
+    <div class="card">
+        <div class="type-row">
+            <label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
+            <label><input type="radio" name="type" value="Charger"> Charger</label>
+        </div>
+    </div>
 
-<div class="video-box">
-    <video id="video" autoplay muted playsinline></video>
-    <div class="laser"></div>
-</div>
+    <!-- Camera -->
+    <div class="video-box">
+        <video id="video" autoplay muted playsinline></video>
+        <div class="scan-frame"></div>
+        <div class="laser"></div>
+    </div>
 
-<button class="btn-blue" onclick="startScanner()">🔄 Start Camera</button>
-<button class="btn-gray" onclick="toggleFlash()">🔦 Flash</button>
+    <div class="status" id="status">Camera not started</div>
 
-<div class="card">
-<label>Zoom</label>
-<input type="range" id="zoom" min="1" max="5" step="0.1" value="1">
-</div>
+    <div class="btn-row">
+        <button class="btn-blue"  onclick="startScanner()">🔄 Start Camera</button>
+        <button class="btn-gray"  id="flashBtn" onclick="toggleFlash()">🔦 Flash OFF</button>
+    </div>
 
-<div class="card">
-<input type="text" id="manual" placeholder="Manual entry"
-oninput="manualInput(this.value)">
-</div>
+    <!-- Zoom -->
+    <div class="card">
+        <span class="zoom-label">Zoom</span>
+        <input type="range" id="zoom" min="1" max="5" step="0.1" value="1">
+    </div>
 
-<div class="card">
-<div>SCANNED VALUE</div>
-<div id="result">---</div>
-</div>
+    <!-- Manual Entry -->
+    <div class="card">
+        <input type="text" id="manual" placeholder="Manual entry...">
+    </div>
 
-<button class="btn-green" onclick="save()">💾 SAVE</button>
+    <!-- Result -->
+    <div class="card">
+        <div class="result-label">SCANNED VALUE</div>
+        <div id="result">---</div>
+    </div>
+
+    <button class="btn-green" onclick="save()">💾 SAVE</button>
 
 </div>
 
 <script>
-
-let codeReader = new ZXing.BrowserMultiFormatReader({
-    delayBetweenScanAttempts: 80,
-    delayBetweenScanSuccess: 400
-});
-
+/* ── State ── */
 let selectedValue = "";
-let currentStream = null;
-let videoTrack = null;
+let currentStream  = null;
+let videoTrack     = null;
+let flashOn        = false;
+let scanning       = false;
+let codeReader     = null;
 
-/* START CAMERA */
+function setStatus(msg) {
+    document.getElementById("status").textContent = msg;
+}
+
+/* ── Start Camera + Scanner ── */
 async function startScanner() {
 
+    if (scanning) { setStatus("Camera already running"); return; }
+
+    // Stop any existing stream
     if (currentStream) {
         currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+        videoTrack    = null;
+        flashOn       = false;
+        document.getElementById("flashBtn").textContent = "🔦 Flash OFF";
     }
+
+    setStatus("Requesting camera...");
 
     const video = document.getElementById("video");
 
     try {
-        const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-
-        const backCamera = devices.find(d =>
-            d.label.toLowerCase().includes("back") ||
-            d.label.toLowerCase().includes("rear")
-        ) || devices[0];
-
+        /* getUserMedia with environment (back) camera */
         currentStream = await navigator.mediaDevices.getUserMedia({
             video: {
-                deviceId: backCamera.deviceId,
-                width: { ideal: 1920 },
+                facingMode: { ideal: "environment" },
+                width:  { ideal: 1920 },
                 height: { ideal: 1080 }
             }
         });
 
         video.srcObject = currentStream;
+        await video.play();
 
         videoTrack = currentStream.getVideoTracks()[0];
+        setStatus("Camera on — point at a barcode");
+        scanning = true;
 
-        codeReader.decodeFromVideoDevice(backCamera.deviceId, video, (result, err) => {
+        /* ZXing decode loop */
+        const hints = new Map();
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+        codeReader.decodeFromVideoElement(video, (result, err) => {
             if (result) {
-                selectedValue = result.text;
-                document.getElementById("result").innerText = selectedValue;
-
+                const text = result.getText ? result.getText() : result.text;
+                selectedValue = text;
+                document.getElementById("result").textContent = text;
+                setStatus("✅ Scanned!");
                 if (navigator.vibrate) navigator.vibrate(150);
             }
         });
 
     } catch (err) {
-        alert("Camera error: " + err);
+        setStatus("Camera error: " + err.message);
+        console.error(err);
     }
 }
 
-/* FLASH */
+/* ── Flash Toggle ── */
 function toggleFlash() {
-    if (!videoTrack) return;
+    if (!videoTrack) { setStatus("Start camera first"); return; }
 
-    const cap = videoTrack.getCapabilities();
+    const cap = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
 
-    if (cap.torch) {
-        videoTrack.applyConstraints({
-            advanced: [{ torch: true }]
-        });
-    } else {
-        alert("Flash not supported");
-    }
+    if (!cap.torch) { setStatus("Flash not supported on this device"); return; }
+
+    flashOn = !flashOn;
+    videoTrack.applyConstraints({ advanced: [{ torch: flashOn }] });
+    document.getElementById("flashBtn").textContent = flashOn ? "🔦 Flash ON" : "🔦 Flash OFF";
 }
 
-/* ZOOM */
+/* ── Zoom ── */
 document.getElementById("zoom").addEventListener("input", function () {
     if (!videoTrack) return;
-
-    const cap = videoTrack.getCapabilities();
-
+    const cap = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
     if (cap.zoom) {
-        videoTrack.applyConstraints({
-            advanced: [{ zoom: this.value }]
-        });
+        videoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(this.value) }] });
     }
 });
 
-/* MANUAL */
-function manualInput(val) {
-    selectedValue = val;
-    document.getElementById("result").innerText = val || "---";
-}
+/* ── Manual Entry ── */
+document.getElementById("manual").addEventListener("input", function () {
+    selectedValue = this.value;
+    document.getElementById("result").textContent = this.value || "---";
+});
 
-/* SAVE */
+/* ── Save ── */
 function save() {
-    if (!selectedValue) {
-        alert("No data");
-        return;
-    }
+    if (!selectedValue) { alert("No data to save"); return; }
 
-    const type = document.querySelector('input[name="type"]:checked').value;
-
-    const scriptUrl = "YOUR_APPS_SCRIPT_URL";
+    const type      = document.querySelector('input[name="type"]:checked').value;
+    const scriptUrl = "YOUR_APPS_SCRIPT_URL";   // ← replace with your Apps Script URL
 
     fetch(`${scriptUrl}?type=${encodeURIComponent(type)}&serial=${encodeURIComponent(selectedValue)}`, {
         mode: "no-cors"
-    });
+    }).catch(() => {});
 
-    alert("Saved ✅");
-    location.reload();
+    alert("Saved ✅  " + type + " — " + selectedValue);
+
+    // Reset
+    selectedValue = "";
+    document.getElementById("result").textContent = "---";
+    document.getElementById("manual").value = "";
+    setStatus("Ready to scan next item");
 }
 
-/* AUTO START */
-window.onload = startScanner;
-
+/* ── Auto-start on load ── */
+window.addEventListener("load", () => {
+    setTimeout(startScanner, 600);
+});
 </script>
-
 </body>
 </html>
