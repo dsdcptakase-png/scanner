@@ -3,8 +3,6 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<script src="https://unpkg.com/html5-qrcode"></script>
-
 <style>
 body {
   margin:0;
@@ -12,32 +10,28 @@ body {
   background:#eef2f7;
 }
 
-/* HEADER */
 .header {
   background:#0d6efd;
   color:white;
-  padding:12px;
+  padding:14px;
   text-align:center;
   font-weight:bold;
-  font-size:18px;
 }
 
-/* CONTAINER */
 .container {
   max-width:420px;
   margin:auto;
-  padding:8px;
+  padding:10px;
 }
 
-/* CARD */
 .card {
   background:white;
-  padding:10px;
+  padding:12px;
   border-radius:12px;
-  margin-bottom:8px;
+  margin-bottom:10px;
 }
 
-/* SLIDER */
+/* slider */
 .switch {
   display:flex;
   background:#ddd;
@@ -45,53 +39,40 @@ body {
   overflow:hidden;
 }
 .switch input { display:none; }
-
 .switch label {
   flex:1;
-  padding:8px;
+  padding:10px;
   text-align:center;
-  font-size:14px;
 }
-
 .switch input:checked + label {
   background:#0d6efd;
   color:white;
 }
 
-/* CAMERA FIX */
-#reader {
-  width:100%;
-  height:200px;
-  position:relative;
-  overflow:hidden;
-  border-radius:12px;
-  background:black;
-}
-
-#reader video {
-  width:100% !important;
-  height:100% !important;
-  object-fit:cover;
-}
-
-/* RESULT */
-.result {
-  font-size:14px;
-  color:green;
-  font-weight:bold;
-  word-break:break-word;
-}
-
-/* BUTTON */
-button {
+input {
   width:100%;
   padding:12px;
+  border-radius:10px;
+  border:1px solid #ccc;
+  font-size:16px;
+}
+
+button {
+  width:100%;
+  padding:14px;
   border:none;
   border-radius:10px;
   background:#0d6efd;
   color:white;
-  font-size:15px;
+  font-size:16px;
+  margin-top:8px;
 }
+
+.result {
+  font-weight:bold;
+  color:green;
+}
+
 </style>
 </head>
 
@@ -101,7 +82,7 @@ button {
 
 <div class="container">
 
-<!-- Asset Type -->
+<!-- Asset -->
 <div class="card">
   <div class="switch">
     <input type="radio" id="laptop" name="type" value="Laptop" checked>
@@ -112,98 +93,29 @@ button {
   </div>
 </div>
 
-<!-- Scan Mode -->
+<!-- INPUT -->
 <div class="card">
-  <div class="switch">
-    <input type="radio" id="qr" name="mode" value="qr">
-    <label for="qr">QR</label>
-
-    <input type="radio" id="bar" name="mode" value="bar" checked>
-    <label for="bar">BAR</label>
-  </div>
-</div>
-
-<!-- CAMERA -->
-<div class="card">
-  <div id="reader"></div>
+  <input type="text" id="code" placeholder="Tap here → Scan using phone camera">
 </div>
 
 <!-- RESULT -->
 <div class="card result" id="result">Waiting...</div>
 
-<!-- SAVE -->
 <button onclick="save()">💾 Save</button>
 
 </div>
 
 <script>
 
-let scanner;
-let scanned = "";
+// 👉 Auto paste from scanner apps
+document.getElementById("code").addEventListener("input", function() {
+  document.getElementById("result").innerText = this.value;
+});
 
-// 🔊 beep
-const beep = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-
-// START
-function startScanner() {
-  if (scanner) {
-    scanner.stop().then(init);
-  } else {
-    init();
-  }
-}
-
-function init() {
-
-  scanner = new Html5Qrcode("reader");
-
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-
-  let config = mode === "qr"
-    ? { fps: 15, qrbox: 180 } // square
-    : { fps: 15, qrbox: { width: 250, height: 80 } }; // rectangle
-
-  Html5Qrcode.getCameras().then(devices => {
-
-    let cam = devices.find(d =>
-      d.label.toLowerCase().includes("back") ||
-      d.label.toLowerCase().includes("environment")
-    );
-
-    scanner.start(
-      cam ? cam.id : devices[0].id,
-      config,
-      (text) => {
-
-        if (text === scanned) return;
-
-        scanned = text;
-        document.getElementById("result").innerText = text;
-
-        navigator.vibrate?.(200);
-        beep.play();
-      }
-    );
-
-  });
-}
-
-// AUTO SWITCH
-document.getElementById("laptop").onchange = ()=>{
-  document.getElementById("bar").checked = true;
-  startScanner();
-};
-
-document.getElementById("charger").onchange = ()=>{
-  document.getElementById("qr").checked = true;
-  startScanner();
-};
-
-document.getElementById("qr").onchange = startScanner;
-document.getElementById("bar").onchange = startScanner;
-
-// SAVE (WORKING METHOD)
+// SAVE
 function save() {
+
+  let scanned = document.getElementById("code").value;
 
   if (!scanned) {
     alert("Scan first!");
@@ -220,15 +132,12 @@ function save() {
     .then(res => res.text())
     .then(msg => {
 
-      alert(msg); // Saved / Duplicate
+      alert(msg);
 
-      scanned = "";
+      document.getElementById("code").value = "";
       document.getElementById("result").innerText = "Waiting...";
     });
 }
-
-// START APP
-startScanner();
 
 </script>
 
