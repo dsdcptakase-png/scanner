@@ -11,22 +11,22 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
 .header {
   background:#0d6efd;
   color:white;
-  padding:15px;
+  padding:12px;
   text-align:center;
   font-weight:bold;
 }
 
 .container {
-  max-width:480px;
+  max-width:420px;
   margin:auto;
-  padding:10px;
+  padding:8px;
 }
 
 .card {
   background:white;
-  padding:14px;
-  border-radius:14px;
-  margin-bottom:10px;
+  padding:10px;
+  border-radius:12px;
+  margin-bottom:8px;
 }
 
 /* slider */
@@ -39,7 +39,7 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
 .switch input { display:none; }
 .switch label {
   flex:1;
-  padding:10px;
+  padding:8px;
   text-align:center;
 }
 .switch input:checked + label {
@@ -49,21 +49,24 @@ body { margin:0; font-family:system-ui; background:#eef2f7; }
 
 button {
   width:100%;
-  padding:14px;
+  padding:12px;
   border:none;
   border-radius:10px;
   background:#0d6efd;
   color:white;
-  margin-top:8px;
-  font-size:16px;
+  margin-top:6px;
 }
 
-#reader { width:100%; }
+/* 🔥 SMALL CAMERA */
+#reader {
+  width:100%;
+  height:220px;
+}
 
 .result {
   font-weight:bold;
   color:green;
-  word-break:break-word;
+  font-size:14px;
 }
 
 </style>
@@ -75,7 +78,7 @@ button {
 
 <div class="container">
 
-<!-- Asset Type -->
+<!-- Asset -->
 <div class="card">
   <div class="switch">
     <input type="radio" id="laptop" name="type" value="Laptop" checked>
@@ -86,7 +89,7 @@ button {
   </div>
 </div>
 
-<!-- Scan Mode -->
+<!-- Mode -->
 <div class="card">
   <div class="switch">
     <input type="radio" id="qr" name="mode" value="qr">
@@ -97,22 +100,11 @@ button {
   </div>
 </div>
 
-<!-- Zoom -->
-<div class="card">
-  Zoom:
-  <input type="range" id="zoom" min="1" max="5" step="0.1" value="1">
-</div>
-
-<!-- Scanner -->
 <div class="card">
   <div id="reader"></div>
-  <button onclick="toggleTorch()">💡 Flash</button>
 </div>
 
-<!-- Result -->
-<div class="card">
-  <div id="result" class="result">Waiting...</div>
-</div>
+<div class="card result" id="result">Waiting...</div>
 
 <button onclick="save()">💾 Save</button>
 
@@ -122,50 +114,34 @@ button {
 
 let scanner;
 let scanned = "";
-let torch = false;
-let currentZoom = 1;
 
 const beep = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
 
-// START SCANNER
 function startScanner() {
 
   if (scanner) {
-    scanner.stop().then(initScanner);
+    scanner.stop().then(init);
   } else {
-    initScanner();
+    init();
   }
 }
 
-function initScanner() {
+function init() {
 
   scanner = new Html5Qrcode("reader");
 
   const mode = document.querySelector('input[name="mode"]:checked').value;
 
-  let config;
-
-  if (mode === "qr") {
-    config = {
-      fps: 20,
-      qrbox: { width: 300, height: 300 }
-    };
-  } else {
-    config = {
-      fps: 20,
-      qrbox: { width: 350, height: 120 }
-    };
-  }
+  let config = mode === "qr"
+    ? { fps:15, qrbox:{width:220,height:220} }
+    : { fps:15, qrbox:{width:300,height:100} };
 
   Html5Qrcode.getCameras().then(devices => {
 
-    let back = devices.find(d =>
-      d.label.toLowerCase().includes("back") ||
-      d.label.toLowerCase().includes("environment")
-    );
+    let cam = devices.find(d => d.label.toLowerCase().includes("back"));
 
     scanner.start(
-      back ? back.id : devices[0].id,
+      cam ? cam.id : devices[0].id,
       config,
       (text) => {
 
@@ -177,53 +153,26 @@ function initScanner() {
         navigator.vibrate?.(200);
         beep.play();
       }
-    ).then(applyZoom);
+    );
 
   });
 }
 
-// ZOOM
-function applyZoom() {
-  scanner.applyVideoConstraints({
-    advanced: [{ zoom: currentZoom }]
-  }).catch(()=>{});
-}
-
-document.getElementById("zoom").addEventListener("input", (e)=>{
-  currentZoom = parseFloat(e.target.value);
-  applyZoom();
-});
-
-// FLASH
-function toggleTorch() {
-  torch = !torch;
-
-  scanner.applyVideoConstraints({
-    advanced:[{torch:torch}]
-  }).catch(()=>alert("Flash not supported"));
-}
-
-// AUTO SWITCH
-document.getElementById("laptop").addEventListener("change", ()=>{
+// auto switch
+document.getElementById("laptop").onchange = ()=>{
   document.getElementById("bar").checked = true;
   startScanner();
-});
+};
 
-document.getElementById("charger").addEventListener("change", ()=>{
+document.getElementById("charger").onchange = ()=>{
   document.getElementById("qr").checked = true;
   startScanner();
-});
+};
 
-// MODE CHANGE
-document.getElementById("qr").addEventListener("change", startScanner);
-document.getElementById("bar").addEventListener("change", startScanner);
+document.getElementById("qr").onchange = startScanner;
+document.getElementById("bar").onchange = startScanner;
 
-// TAP REFOCUS
-document.getElementById("reader").addEventListener("click", ()=>{
-  startScanner();
-});
-
-// SAVE (NO-CORS FIX)
+// SAVE (🔥 FIXED)
 function save() {
 
   if (!scanned) {
@@ -233,28 +182,21 @@ function save() {
 
   const type = document.querySelector('input[name="type"]:checked').value;
 
-  fetch("https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec", {
-    method: "POST",
-    mode: "no-cors",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      assetType: type,
-      serialNumber: scanned
-    })
-  })
-  .then(() => {
-    alert("✅ Saved successfully!");
-    scanned = "";
-    document.getElementById("result").innerText = "Waiting...";
-  })
-  .catch(err => {
-    alert("Error: " + err);
-  });
+  let url = "https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec"
+    + "?assetType=" + encodeURIComponent(type)
+    + "&serialNumber=" + encodeURIComponent(scanned);
+
+  fetch(url)
+    .then(res => res.text())
+    .then(msg => {
+      alert(msg); // shows Saved / Duplicate
+
+      scanned = "";
+      document.getElementById("result").innerText = "Waiting...";
+    });
 }
 
-// START
+// start
 startScanner();
 
 </script>
