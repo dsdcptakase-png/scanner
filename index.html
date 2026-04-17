@@ -9,19 +9,27 @@
 body { margin:0; font-family:system-ui; background:#eef2f7; }
 
 .header {
-  background:#0d6efd; color:white;
-  padding:15px; text-align:center;
+  background:#0d6efd;
+  color:white;
+  padding:15px;
+  text-align:center;
   font-weight:bold;
 }
 
-.container { max-width:480px; margin:auto; padding:10px; }
-
-.card {
-  background:white; padding:14px;
-  border-radius:14px; margin-bottom:10px;
+.container {
+  max-width:480px;
+  margin:auto;
+  padding:10px;
 }
 
-/* SLIDER */
+.card {
+  background:white;
+  padding:14px;
+  border-radius:14px;
+  margin-bottom:10px;
+}
+
+/* slider */
 .switch {
   display:flex;
   background:#ddd;
@@ -47,7 +55,10 @@ button {
   background:#0d6efd;
   color:white;
   margin-top:8px;
+  font-size:16px;
 }
+
+#reader { width:100%; }
 
 .result {
   font-weight:bold;
@@ -55,21 +66,17 @@ button {
   word-break:break-word;
 }
 
-#reader {
-  width:100%;
-}
 </style>
 </head>
 
 <body>
 
-<div class="header">📱 Smart Asset Scanner</div>
+<div class="header">📱 Asset Scanner</div>
 
 <div class="container">
 
-<!-- ASSET TYPE -->
+<!-- Asset Type -->
 <div class="card">
-  <b>Asset Type</b>
   <div class="switch">
     <input type="radio" id="laptop" name="type" value="Laptop" checked>
     <label for="laptop">Laptop</label>
@@ -79,25 +86,30 @@ button {
   </div>
 </div>
 
-<!-- SCAN MODE -->
+<!-- Scan Mode -->
 <div class="card">
-  <b>Scan Mode</b>
   <div class="switch">
-    <input type="radio" id="qr" name="scanMode" value="qr">
+    <input type="radio" id="qr" name="mode" value="qr">
     <label for="qr">QR</label>
 
-    <input type="radio" id="bar" name="scanMode" value="bar">
+    <input type="radio" id="bar" name="mode" value="bar" checked>
     <label for="bar">BAR</label>
   </div>
 </div>
 
-<!-- SCANNER -->
+<!-- Zoom -->
+<div class="card">
+  Zoom:
+  <input type="range" id="zoom" min="1" max="5" step="0.1" value="1">
+</div>
+
+<!-- Scanner -->
 <div class="card">
   <div id="reader"></div>
   <button onclick="toggleTorch()">💡 Flash</button>
 </div>
 
-<!-- RESULT -->
+<!-- Result -->
 <div class="card">
   <div id="result" class="result">Waiting...</div>
 </div>
@@ -111,15 +123,15 @@ button {
 let scanner;
 let scanned = "";
 let torch = false;
+let currentZoom = 1;
 
-// 🔊 beep
 const beep = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
 
-// 🔁 START SCANNER
+// START SCANNER
 function startScanner() {
 
   if (scanner) {
-    scanner.stop().then(()=>initScanner());
+    scanner.stop().then(initScanner);
   } else {
     initScanner();
   }
@@ -129,19 +141,19 @@ function initScanner() {
 
   scanner = new Html5Qrcode("reader");
 
-  const mode = document.querySelector('input[name="scanMode"]:checked').value;
+  const mode = document.querySelector('input[name="mode"]:checked').value;
 
   let config;
 
   if (mode === "qr") {
     config = {
       fps: 20,
-      qrbox: { width: 250, height: 250 } // 🔲 square
+      qrbox: { width: 300, height: 300 }
     };
   } else {
     config = {
       fps: 20,
-      qrbox: { width: 300, height: 120 } // ▭ rectangle
+      qrbox: { width: 350, height: 120 }
     };
   }
 
@@ -165,27 +177,24 @@ function initScanner() {
         navigator.vibrate?.(200);
         beep.play();
       }
-    );
+    ).then(applyZoom);
 
   });
 }
 
-// 🔥 AUTO SWITCH BASED ON ASSET TYPE
-document.getElementById("laptop").addEventListener("change", () => {
-  document.getElementById("bar").checked = true;
-  startScanner();
+// ZOOM
+function applyZoom() {
+  scanner.applyVideoConstraints({
+    advanced: [{ zoom: currentZoom }]
+  }).catch(()=>{});
+}
+
+document.getElementById("zoom").addEventListener("input", (e)=>{
+  currentZoom = parseFloat(e.target.value);
+  applyZoom();
 });
 
-document.getElementById("charger").addEventListener("change", () => {
-  document.getElementById("qr").checked = true;
-  startScanner();
-});
-
-// 🔄 MANUAL MODE CHANGE
-document.getElementById("qr").addEventListener("change", startScanner);
-document.getElementById("bar").addEventListener("change", startScanner);
-
-// 💡 FLASH
+// FLASH
 function toggleTorch() {
   torch = !torch;
 
@@ -194,7 +203,27 @@ function toggleTorch() {
   }).catch(()=>alert("Flash not supported"));
 }
 
-// 💾 SAVE
+// AUTO SWITCH
+document.getElementById("laptop").addEventListener("change", ()=>{
+  document.getElementById("bar").checked = true;
+  startScanner();
+});
+
+document.getElementById("charger").addEventListener("change", ()=>{
+  document.getElementById("qr").checked = true;
+  startScanner();
+});
+
+// MODE CHANGE
+document.getElementById("qr").addEventListener("change", startScanner);
+document.getElementById("bar").addEventListener("change", startScanner);
+
+// TAP REFOCUS
+document.getElementById("reader").addEventListener("click", ()=>{
+  startScanner();
+});
+
+// SAVE (NO-CORS FIX)
 function save() {
 
   if (!scanned) {
@@ -205,30 +234,27 @@ function save() {
   const type = document.querySelector('input[name="type"]:checked').value;
 
   fetch("https://script.google.com/macros/s/AKfycbxCJPT0hf9Y0JpJV1bflXfG6v8YZzdhhAphYyr1M1oHWAVj139H_wJvj9U-03_usrgicg/exec", {
-    method:"POST",
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      action:"save",
-      assetType:type,
-      serialNumber:scanned
+      assetType: type,
+      serialNumber: scanned
     })
   })
-  .then(r=>r.json())
-  .then(res=>{
-
-    if(res.status==="duplicate"){
-      alert("Duplicate!");
-      return;
-    }
-
-    alert("Saved: " + res.assetNumber);
-
+  .then(() => {
+    alert("✅ Saved successfully!");
     scanned = "";
     document.getElementById("result").innerText = "Waiting...";
+  })
+  .catch(err => {
+    alert("Error: " + err);
   });
 }
 
-// 🚀 START DEFAULT
-document.getElementById("bar").checked = true; // Laptop default
+// START
 startScanner();
 
 </script>
