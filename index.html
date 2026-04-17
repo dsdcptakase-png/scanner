@@ -3,12 +3,10 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<script src="https://unpkg.com/html5-qrcode"></script>
+
 <style>
-body {
-  margin:0;
-  font-family:system-ui;
-  background:#eef2f7;
-}
+body { margin:0; font-family:system-ui; background:#eef2f7; }
 
 .header {
   background:#0d6efd;
@@ -31,7 +29,6 @@ body {
   margin-bottom:10px;
 }
 
-/* slider */
 .switch {
   display:flex;
   background:#ddd;
@@ -54,7 +51,6 @@ input {
   padding:12px;
   border-radius:10px;
   border:1px solid #ccc;
-  font-size:16px;
 }
 
 button {
@@ -72,7 +68,6 @@ button {
   font-weight:bold;
   color:green;
 }
-
 </style>
 </head>
 
@@ -93,12 +88,15 @@ button {
   </div>
 </div>
 
-<!-- INPUT -->
+<!-- Scan Button -->
 <div class="card">
-  <input type="text" id="code" placeholder="Tap here → Scan using phone camera">
+  <button onclick="openScanner()">📷 Scan Code</button>
 </div>
 
-<!-- RESULT -->
+<!-- Hidden Scanner -->
+<div id="reader" style="display:none;"></div>
+
+<!-- Result -->
 <div class="card result" id="result">Waiting...</div>
 
 <button onclick="save()">💾 Save</button>
@@ -107,15 +105,41 @@ button {
 
 <script>
 
-// 👉 Auto paste from scanner apps
-document.getElementById("code").addEventListener("input", function() {
-  document.getElementById("result").innerText = this.value;
-});
+let html5QrCode = new Html5Qrcode("reader");
+let scanned = "";
+
+// OPEN CAMERA SCANNER
+function openScanner() {
+
+  document.getElementById("reader").style.display = "block";
+
+  Html5Qrcode.getCameras().then(devices => {
+
+    let cam = devices.find(d =>
+      d.label.toLowerCase().includes("back") ||
+      d.label.toLowerCase().includes("environment")
+    );
+
+    html5QrCode.start(
+      cam ? cam.id : devices[0].id,
+      { fps: 10, qrbox: 250 },
+      (decodedText) => {
+
+        scanned = decodedText;
+        document.getElementById("result").innerText = scanned;
+
+        navigator.vibrate?.(200);
+
+        html5QrCode.stop();
+        document.getElementById("reader").style.display = "none";
+      }
+    );
+
+  });
+}
 
 // SAVE
 function save() {
-
-  let scanned = document.getElementById("code").value;
 
   if (!scanned) {
     alert("Scan first!");
@@ -134,7 +158,7 @@ function save() {
 
       alert(msg);
 
-      document.getElementById("code").value = "";
+      scanned = "";
       document.getElementById("result").innerText = "Waiting...";
     });
 }
