@@ -3,75 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Asset Scanner - Focus Enabled</title>
+    <title>Asset Scanner - Barcode Specialist</title>
     <script src="https://unpkg.com/@zxing/library@0.19.1"></script>
     <style>
-        :root { --primary: #0d6efd; --success: #198754; }
-        body { margin:0; font-family: system-ui; background: #f0f2f5; text-align:center; }
+        :root { --primary: #0d6efd; --success: #198754; --bg: #f4f7f9; }
+        body { margin:0; font-family: system-ui; background: var(--bg); text-align:center; }
         .header { background: var(--primary); color:white; padding:15px; font-weight:bold; }
-        .container { max-width:400px; margin:auto; padding:10px; }
-        .card { background:white; padding:12px; border-radius:12px; margin-bottom:10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .container { max-width:420px; margin:auto; padding:12px; }
+        .card { background:white; padding:15px; border-radius:12px; margin-bottom:12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         
-        /* Video Container */
-        .video-wrapper { position: relative; background: #000; border-radius: 12px; overflow: hidden; cursor: pointer; }
-        video { width: 100%; height: 320px; object-fit: cover; display: block; }
+        /* Camera Section */
+        .video-wrapper { position: relative; background: #000; border-radius: 12px; overflow: hidden; }
+        video { width: 100%; height: 280px; object-fit: cover; display: block; }
         
-        /* Focus Ring Animation */
-        .focus-ring {
-            position: absolute; top: 50%; left: 50%; width: 60px; height: 60px;
-            border: 2px solid yellow; border-radius: 50%; transform: translate(-50%, -50%) scale(0);
-            pointer-events: none; opacity: 0;
+        /* Barcode Alignment Line */
+        .barcode-line {
+            position: absolute; top: 50%; left: 10%; width: 80%; height: 2px;
+            background: rgba(255, 0, 0, 0.6); box-shadow: 0 0 8px red;
+            pointer-events: none; z-index: 10;
         }
-        .focus-active { animation: focus-pulse 0.5s ease-out; }
-        @keyframes focus-pulse {
-            0% { transform: translate(-50%, -50%) scale(2); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        .guide-box {
+            position: absolute; top: 30%; left: 10%; width: 80%; height: 40%;
+            border: 2px dashed rgba(255,255,255,0.5); border-radius: 8px; pointer-events: none;
         }
 
-        .tap-hint { font-size: 12px; color: #666; margin-top: 5px; }
-        button { width:100%; padding:15px; border:none; border-radius:10px; color:white; font-size:16px; font-weight:bold; margin-top:10px; }
-        .btn-blue { background: var(--primary); }
-        .btn-green { background: var(--success); }
-        .result { font-size: 18px; color: var(--success); font-weight: bold; min-height: 24px; }
+        .flex { display: flex; gap: 8px; margin-bottom: 10px; }
+        button { flex: 1; padding: 14px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .btn-scan { background: var(--primary); color: white; }
+        .btn-manual { background: #6c757d; color: white; }
+        .btn-save { background: var(--success); color: white; width: 100%; font-size: 1.1rem; }
+
+        #manualInputSection { display: none; }
+        input[type="text"] { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        
+        #result { font-size: 18px; color: var(--success); font-weight: bold; margin: 10px 0; min-height: 24px; }
     </style>
 </head>
 <body>
 
-<div class="header">📱 High-Res Asset Scanner</div>
+<div class="header">📋 Asset Barcode Scanner</div>
 
 <div class="container">
+    
     <div class="card">
         <label><input type="radio" name="type" value="Laptop" checked> Laptop</label>
         &nbsp;&nbsp;
         <label><input type="radio" name="type" value="Charger"> Charger</label>
     </div>
 
-    <button class="btn-blue" onclick="startScanner()">📷 Open Camera</button>
-    <p class="tap-hint">If blurry, <b>Tap the Video</b> to refocus</p>
+    <div class="flex">
+        <button class="btn-scan" onclick="startScanner()">📷 Start Scanner</button>
+        <button class="btn-manual" onclick="toggleManual()">⌨️ Manual</button>
+    </div>
 
-    <div class="card video-wrapper" onclick="manualFocus()">
+    <div class="card video-wrapper" id="scannerCard">
         <video id="video" playsinline muted autoplay></video>
-        <div id="focusRing" class="focus-ring"></div>
+        <div class="barcode-line"></div>
+        <div class="guide-box"></div>
+        <p style="color:white; font-size:10px; position:absolute; bottom:5px; width:100%;">Align barcode with RED LINE</p>
+    </div>
+
+    <div class="card" id="manualInputSection">
+        <input type="text" id="manualSerial" placeholder="Type Serial Number..." oninput="syncManual()">
     </div>
 
     <div class="card">
-        <div id="status" style="font-size:12px; color:#999">Status: Standby</div>
-        <div class="result" id="result">---</div>
+        <div id="status" style="font-size:11px; color:#777">Ready</div>
+        <div id="result">---</div>
     </div>
 
-    <button class="btn-green" onclick="save()">💾 Save to Sheet</button>
+    <button class="btn-save" onclick="saveData()">💾 Save to Sheet</button>
+
 </div>
 
 <script>
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    let selectedDeviceId;
-    let scanned = "";
-    let streamPtr = null;
+    // ✅ FORCE 1D BARCODE SUPPORT
+    const hints = new Map();
+    const formats = [
+        ZXing.BarcodeFormat.QR_CODE,
+        ZXing.BarcodeFormat.CODE_128, // Common for Serial Numbers
+        ZXing.BarcodeFormat.CODE_39,  // Also used for S/N
+        ZXing.BarcodeFormat.EAN_13
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // Important for thin barcodes
+
+    const codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    let scannedValue = "";
+    let isManual = false;
 
     async function startScanner() {
-        const status = document.getElementById('status');
-        
-        // 1. Force High Resolution (Full HD) for tiny codes
+        document.getElementById('scannerCard').style.display = 'block';
+        document.getElementById('manualInputSection').style.display = 'none';
+        isManual = false;
+
         const constraints = {
             video: {
                 facingMode: { ideal: "environment" },
@@ -81,64 +106,46 @@
         };
 
         try {
-            // Get the stream to apply advanced focus settings later
-            streamPtr = await navigator.mediaDevices.getUserMedia(constraints);
-            const videoElement = document.getElementById('video');
-            videoElement.srcObject = streamPtr;
+            const videoEl = document.getElementById('video');
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoEl.srcObject = stream;
 
-            status.innerText = "Status: Camera Active (1080p)";
-
-            codeReader.decodeFromVideoElement(videoElement, (result, err) => {
-                if (result) {
-                    scanned = result.getText();
-                    document.getElementById("result").innerText = scanned;
+            codeReader.decodeFromVideoElement(videoEl, (result, err) => {
+                if (result && !isManual) {
+                    scannedValue = result.getText();
+                    document.getElementById('result').innerText = scannedValue;
                     if (navigator.vibrate) navigator.vibrate(100);
                 }
             });
-
         } catch (e) {
-            alert("Error: " + e);
+            alert("Camera error. Check HTTPS/Permissions.");
         }
     }
 
-    // SIMULATED MANUAL FOCUS
-    async function manualFocus() {
-        if (!streamPtr) return;
-
-        // Visual Feedback
-        const ring = document.getElementById('focusRing');
-        ring.classList.remove('focus-active');
-        void ring.offsetWidth; // Trigger reflow
-        ring.classList.add('focus-active');
-
-        const track = streamPtr.getVideoTracks()[0];
-        const capabilities = track.getCapabilities();
-
-        // Check if the browser supports focusing
-        if (capabilities.focusMode) {
-            try {
-                // We toggle between 'continuous' and 'manual' to force the hardware to recalibrate
-                await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-                console.log("Focus reset triggered");
-            } catch (e) {
-                console.log("Focus constraint not supported by this phone.");
-            }
-        } else {
-            // Fallback: Restart the reader logic briefly
-            console.log("Hardware focus not accessible. Ensure you are 6+ inches away.");
-        }
+    function toggleManual() {
+        isManual = true;
+        document.getElementById('scannerCard').style.display = 'none';
+        document.getElementById('manualInputSection').style.display = 'block';
+        document.getElementById('manualSerial').focus();
     }
 
-    function save() {
-        if (!scanned) return alert("Scan first!");
+    function syncManual() {
+        scannedValue = document.getElementById('manualSerial').value;
+        document.getElementById('result').innerText = scannedValue || "---";
+    }
+
+    async function saveData() {
+        if (!scannedValue) return alert("Scan or type first!");
         const type = document.querySelector('input[name="type"]:checked').value;
-        const url = "YOUR_SCRIPT_URL_HERE?assetType=" + encodeURIComponent(type) + "&serialNumber=" + encodeURIComponent(scanned);
-        
+        const scriptUrl = "YOUR_APPS_SCRIPT_URL_HERE"; 
+        const url = `${scriptUrl}?assetType=${encodeURIComponent(type)}&serialNumber=${encodeURIComponent(scannedValue)}`;
+
         fetch(url, { mode: 'no-cors' }).then(() => {
             alert("✅ Saved!");
-            scanned = "";
-            document.getElementById("result").innerText = "---";
-        });
+            scannedValue = "";
+            document.getElementById('result').innerText = "---";
+            document.getElementById('manualSerial').value = "";
+        }).catch(e => alert("Error: " + e));
     }
 </script>
 
